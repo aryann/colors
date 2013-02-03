@@ -3,8 +3,9 @@
 /formatted-colors handler to stdout whenever there is a change.
 
 If a command is given to this program, it will be executed with the
-contents of the /formatted-colors. The command will only be executed
-if the response from the server matches RESPONSE_REGEX.
+contents of the /formatted-colors as the arguments and nothing will be
+printed to stdout. The command will only be executed if the response
+from the server matches RESPONSE_REGEX.
 """
 
 __author__ = 'Aryan Naraghi (aryan.naraghi@gmail.com)'
@@ -45,12 +46,13 @@ def main(argv):
                 time.sleep(POLL_INTERVAL_SEC)
                 continue
 
-            print cur
             if len(argv) > 1:
                 cmd = argv[1:] + cur.split()
                 logging.info('Running <%s>...', ' '.join(cmd))
                 assert RESPONSE_REGEX.match(cur)  # Just to be extra safe!
                 subprocess.call(cmd)
+            else:
+                print cur
 
         time.sleep(POLL_INTERVAL_SEC)
         prev = cur
