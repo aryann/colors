@@ -14,6 +14,7 @@ DATA_KEY = '0'
 
 # HTTP eror code(s)
 HTTP_BAD_REQUEST = 400
+HTTP_NOT_FOUND = 404
 
 # Allowed value ranges
 MIN_COLORS_ALLOWED = 1
@@ -116,6 +117,11 @@ class Formatter(webapp2.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
         data = Data.get_by_key_name(DATA_KEY)
+        if not data:
+            self.response.write('There is no color data available right now.\n')
+            self.response.set_status(HTTP_NOT_FOUND)
+            return
+
         display = str(data.display_duration_ms)
         fadeout = str(data.fadeout_duration_ms)
         for color in data.colors:
