@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Color changer</title>
+    <style type="text/css">
+      body {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status"></div>
+    <code id="data"></code>
+
+    <p>
+      <label for="display_duration_ms">Display time:</label>
+      <input type="range" id="display_duration_ms" step="100" min="{{ duration_min}}" max="{{ duration_max }}" />
+      <span id="display_duration_ms_val"></span>
+    </p>
+    <p>
+      <label for="fadeout_duration_ms">Fadeout time:</label>
+      <input type="range" id="fadeout_duration_ms" step="100" min="{{ duration_min}}" max="{{ duration_max }}" />
+      <span id="fadeout_duration_ms_val"></span>
+    </p>
+
+    <script type="text/javascript">
+      (function() {
+        var READY_STATE_COMPLETE = 4;
+        var HTTP_OK = 200;
+
+        var UPDATE_INTERVAL_MS = 3000;  // 3 seconds
+
+        // The number of failed requests that will be tolerated before
+        // giving up.
+        var ERROR_TOLERANCE = 3;
+
+        // Invokes callback for each element in array.
+        var foreach = function(array, callback) {
+          if (typeof array !== "object" || typeof array.length != "number") {
+            throw new TypeError("First argument must be an array.");
+          }
+          for (var i = 0; i < array.length; i++) {
+            callback(array[i]);
+          }
+        }
+
+        var statusBar = document.getElementById("status");
+        var STATUSES = {
+          ready: "Ready.",
+          sending: "Sending request...",
+          failed: "The last request failed.",
+          serverDown: "The server appears to be down.",
+        }
+        var setStatus = function(message) {
+          if (statusBar) {
+            statusBar.innerHTML = message;
+          }
+        }
+
+	var data = null;
+	var newDataAvailable = false;
+
+        var updateSliderValueSpan = function(slider) {
+          var span = document.getElementById(slider.id + "_val");
+          if (span) {
+            span.innerHTML = parseInt(slider.value) / 1000 + " sec";
+          }
+        }
+
+        controlElems = document.getElementsByTagName("input");
+
+        var getCurrentState = function() {
+          setStatus(STATUSES.sending);
+          var req = new XMLHttpRequest();
+          req.onreadystatechange = function() {
+            if (req.readyState !== READY_STATE_COMPLETE) {
+              return;
+            }
+            if (req.status === HTTP_OK) {
+              data = JSON.parse(req.responseText);
+              foreach(controlElems, function(elem) {
+                elem.value = data[elem.id];
+                updateSliderValueSpan(elem);
+              });
+              updateDataContainer();
+              setStatus(STATUSES.ready);
+            } else {
+              setStatus(STATUSES.failed);
+            }
+          };
+          req.open("GET", "/colors?format=json", true);
+          req.send(null);
+          setTimeout(function() { req.abort(); }, UPDATE_INTERVAL_MS / 2);
+        };
+        getCurrentState();
+
+        var errCount = 0;
+        var update = function() {
+          if (errCount >= 3) {
+            setStatus(STATUSES.serverDown);
+            clearInterval(intervalId);
+            return;
+          }
+
+	  if (!newDataAvailable) {
+            return;
+          }
+
+          setStatus(STATUSES.sending);
+          var req = new XMLHttpRequest();
+          req.onreadystatechange = function() {
+            if (req.readyState !== READY_STATE_COMPLETE) {
+              return;
+            }
+            if (req.status === HTTP_OK) {
+              newDataAvailable = false;
+              setStatus(STATUSES.ready);
+            } else {
+              errCount++;
+              setStatus(STATUSES.failed);
+            }
+          };
+          req.open("POST", "/colors", true);
+          req.send(JSON.stringify(data));
+        }
+
+	var updateDataContainer = function() {
+          var elem = document.getElementById("data");
+          if (elem) {
+            elem.innerHTML = JSON.stringify(data);
+          }
+        };
+
+        // Adds onchange callbacks to the sliders.
+        foreach(controlElems, function(elem) {
+          elem.onchange = function() {
+            data[elem.id] = parseInt(elem.value);
+            updateSliderValueSpan(elem);
+            updateDataContainer();
+	    newDataAvailable = true;
+          };
+        });
+
+        var intervalId = setInterval(update, UPDATE_INTERVAL_MS);
+        setStatus(STATUSES.ready);
+
+        // Don't show anything until the JS above has had a chance to
+        // be executed.
+        document.getElementsByTagName("body")[0].style.display = "block";
+      })();
+    </script>
+  </body>
+</html>

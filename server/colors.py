@@ -4,10 +4,12 @@ __author__ = 'Aryan Naraghi (aryan.naraghi@gmail.com)'
 
 import json
 import logging
+import os
 import supported_colors
 import webapp2
 
 from google.appengine.ext import db
+from google.appengine.ext.webapp import template
 
 # We only need to store one entity--this constant defines its key.
 DATA_KEY = '0'
@@ -138,5 +140,17 @@ class ColorPublisher(RequestHandler):
         self.return_json(supported_colors.COLORS)
 
 
-app = webapp2.WSGIApplication([('/colors', ColorHandler),
-                               ('/supported-colors', ColorPublisher)])
+class MainPage(webapp2.RequestHandler):
+
+    def get(self):
+        path = os.path.join(os.path.dirname(__file__), 'index.html')
+        template_vals = {'duration_min': MIN_DURATION_MS,
+                         'duration_max': MAX_DURATION_MS}
+        self.response.write(template.render(path, template_vals))
+
+
+app = webapp2.WSGIApplication([
+        ('/', MainPage),
+        ('/colors', ColorHandler),
+        ('/supported-colors', ColorPublisher)
+        ])
