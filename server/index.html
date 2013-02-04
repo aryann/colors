@@ -24,6 +24,8 @@
       <span id="fadeout_duration_ms_val"></span>
     </p>
 
+    <div id="colors"></div>
+
     <script type="text/javascript">
       (function() {
         var READY_STATE_COMPLETE = 4;
@@ -34,6 +36,11 @@
         // The number of failed requests that will be tolerated before
         // giving up.
         var ERROR_TOLERANCE = 3;
+
+        var COLORS = [
+          {% for color in supported_colors %}"{{ color }}",
+          {% endfor %}
+        ];
 
         // Invokes callback for each element in array.
         var foreach = function(array, callback) {
@@ -70,6 +77,42 @@
 
         controlElems = document.getElementsByTagName("input");
 
+        var initState = function() {
+          foreach(controlElems, function(elem) {
+            elem.value = data[elem.id];
+            updateSliderValueSpan(elem);
+          });
+
+          foreach(COLORS, function(color) {
+            var container = document.getElementById("colors");
+            if (!container) {
+              return;
+            }
+            var link = document.createElement("a");
+            link.style.backgroundColor = link.innerHTML = "#" + color;
+            link.href = "#";
+
+            link.style.textDecoration = data.colors.indexOf(color) == -1 ?
+              "line-through" : "none";
+
+            link.onclick = function() {
+              var idx = data.colors.indexOf(color);
+              if (idx == -1) {
+                link.style.textDecoration = "none";
+                data.colors.push(color);
+              } else {
+                link.style.textDecoration = "line-through";
+                data.colors.splice(idx, 1);
+              }
+              newDataAvailable = true;
+              updateDataContainer();
+            };
+            container.appendChild(link);
+          });
+
+          updateDataContainer();
+        };
+
         var getCurrentState = function() {
           setStatus(STATUSES.sending);
           var req = new XMLHttpRequest();
@@ -79,11 +122,7 @@
             }
             if (req.status === HTTP_OK) {
               data = JSON.parse(req.responseText);
-              foreach(controlElems, function(elem) {
-                elem.value = data[elem.id];
-                updateSliderValueSpan(elem);
-              });
-              updateDataContainer();
+              initState();
               setStatus(STATUSES.ready);
             } else {
               setStatus(STATUSES.failed);
@@ -91,7 +130,6 @@
           };
           req.open("GET", "/colors?format=json", true);
           req.send(null);
-          setTimeout(function() { req.abort(); }, UPDATE_INTERVAL_MS / 2);
         };
         getCurrentState();
 
@@ -141,6 +179,7 @@
 	    newDataAvailable = true;
           };
         });
+
 
         var intervalId = setInterval(update, UPDATE_INTERVAL_MS);
         setStatus(STATUSES.ready);
