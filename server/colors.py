@@ -14,7 +14,6 @@ DATA_KEY = '0'
 
 # HTTP eror code(s)
 HTTP_BAD_REQUEST = 400
-HTTP_NOT_FOUND = 404
 
 # Allowed value ranges
 MIN_COLORS_ALLOWED = 1
@@ -47,15 +46,45 @@ class Data(db.Model):
     display_duration_ms = db.IntegerProperty()
     fadeout_duration_ms = db.IntegerProperty()
 
+    def to_dict(self):
+        return {key: getattr(self, key) for key in self.properties()}
 
-class ColorSetter(webapp2.RequestHandler):
-    """Handler for setting the colors."""
 
-    def write_error(self, msg, *args, **kwargs):
+class RequestHandler(webapp2.RequestHandler):
+    """Base class for handlers."""
+
+    def return_error(self, msg, *args, **kwargs):
+        self.response.clear()
         self.response.write(msg.format(*args, **kwargs))
         if msg[-1] != '\n':
             self.response.write('\n')
         self.response.set_status(HTTP_BAD_REQUEST)
+
+    def return_json(self, payload):
+        self.response.clear()
+        self.response.headers['Content-Type'] = 'application/json'
+        self.response.write(json.dumps(payload))
+        self.response.write('\n')
+
+
+class ColorHandler(RequestHandler):
+    """Handler for setting and viewing the colors."""
+
+    def get(self):
+        data = Data.get_by_key_name(DATA_KEY)
+        if not data:
+            self.return_error('There is no color data available right now.\n')
+            return
+
+        if self.request.get('format') == 'json':
+            self.return_json(data.to_dict())
+        else:
+            display = str(data.display_duration_ms)
+            fadeout = str(data.fadeout_duration_ms)
+            for color in data.colors:
+                self.response.write(':'.join((color, display, fadeout)))
+                self.response.write(' ')
+            self.response.write('\n')
 
     def post(self):
         logging.info('Received POST request: %s', self.request.body)
@@ -68,13 +97,13 @@ class ColorSetter(webapp2.RequestHandler):
             pass
 
         if not has_valid_structure(payload):
-            self.write_error('Request was malformed.')
+            self.return_error('Request was malformed.')
             return
 
         for key in ('display_duration_ms', 'fadeout_duration_ms'):
             duration = payload[key]
             if duration not in xrange(MIN_DURATION_MS, MAX_DURATION_MS + 1):
-                self.write_error(
+                self.return_error(
                     '{key} must be in the range [{min}, {max}]. Received: {val}',
                     key=key,
                     min=MIN_DURATION_MS,
@@ -85,51 +114,29 @@ class ColorSetter(webapp2.RequestHandler):
         colors = payload['colors']
         if len(colors) not in xrange(MIN_COLORS_ALLOWED,
                                      MAX_COLORS_ALLOWED + 1):
-            self.write_error('Received invalid number of colors: {0}',
+            self.return_error('Received invalid number of colors: {0}',
                              len(colors))
             return
 
+        colors = [color.upper() for color in colors]
         for color in colors:
-            if color not in supported_colors.HEX_VALUES:
-                self.write_error('Unrecognized color: {0}', color)
+            if color not in supported_colors.COLORS:
+                self.return_error('Unrecognized color: {0}', color)
                 return
 
         data = Data(key_name=DATA_KEY, **payload)
         data.put()
 
 
-class ColorPublisher(webapp2.RequestHandler):
+class ColorPublisher(RequestHandler):
     """Handler for publishing the supported colors.
 
-    The colors are published as a JSON object that maps human-readable
-    color names to their hex values.
+    The colors are published as a JSON list of hex values.
     """
 
     def get(self):
-        self.response.headers['Content-Type'] = 'application/json'
-        self.response.write(json.dumps(supported_colors.COLORS))
-        self.response.write('\n')
+        self.return_json(supported_colors.COLORS)
 
 
-class Formatter(webapp2.RequestHandler):
-    """Handler for formatting the data for client consumption."""
-
-    def get(self):
-        self.response.headers['Content-Type'] = 'text/plain'
-        data = Data.get_by_key_name(DATA_KEY)
-        if not data:
-            self.response.write('There is no color data available right now.\n')
-            self.response.set_status(HTTP_NOT_FOUND)
-            return
-
-        display = str(data.display_duration_ms)
-        fadeout = str(data.fadeout_duration_ms)
-        for color in data.colors:
-            self.response.write(':'.join((color, display, fadeout)))
-            self.response.write(' ')
-        self.response.write('\n')
-
-
-app = webapp2.WSGIApplication([('/set-colors', ColorSetter),
-                               ('/formatted-colors', Formatter),
+app = webapp2.WSGIApplication([('/colors', ColorHandler),
                                ('/supported-colors', ColorPublisher)])

@@ -17,7 +17,7 @@ import sys
 import time
 import urllib
 
-URL = 'http://localhost:8080/formatted-colors'
+URL = 'http://localhost:8080/colors'
 POLL_INTERVAL_SEC = 5
 
 HTTP_OK = 200
