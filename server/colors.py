@@ -130,16 +130,6 @@ class ColorHandler(RequestHandler):
         data.put()
 
 
-class ColorPublisher(RequestHandler):
-    """Handler for publishing the supported colors.
-
-    The colors are published as a JSON list of hex values.
-    """
-
-    def get(self):
-        self.return_json(supported_colors.COLORS)
-
-
 class MainPage(webapp2.RequestHandler):
 
     def get(self):
@@ -153,5 +143,4 @@ class MainPage(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([
         ('/', MainPage),
         ('/colors', ColorHandler),
-        ('/supported-colors', ColorPublisher)
         ])
