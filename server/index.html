@@ -97,15 +97,19 @@
 
             link.onclick = function() {
               var idx = data.colors.indexOf(color);
-              if (idx == -1) {
+              var len = data.colors.length;
+              if (idx == -1 && len < {{ colors_max }}) {
                 link.style.textDecoration = "none";
                 data.colors.push(color);
-              } else {
+              } else if (idx != -1 && len > {{ colors_min }}) {
                 link.style.textDecoration = "line-through";
                 data.colors.splice(idx, 1);
               }
-              newDataAvailable = true;
-              updateDataContainer();
+              // Only update if a change was made.
+              if (len != data.colors.length) {
+                newDataAvailable = true;
+                updateDataContainer();
+              }
             };
             container.appendChild(link);
           });

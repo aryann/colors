@@ -134,9 +134,12 @@ class MainPage(webapp2.RequestHandler):
 
     def get(self):
         path = os.path.join(os.path.dirname(__file__), 'index.html')
-        template_vals = {'duration_min': MIN_DURATION_MS,
-                         'duration_max': MAX_DURATION_MS,
-                         'supported_colors': supported_colors.COLORS}
+        template_vals = {
+            'colors_min': MIN_COLORS_ALLOWED,
+            'colors_max': MAX_COLORS_ALLOWED,
+            'duration_min': MIN_DURATION_MS,
+            'duration_max': MAX_DURATION_MS,
+            'supported_colors': supported_colors.COLORS}
         self.response.write(template.render(path, template_vals))
 
 
