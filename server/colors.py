@@ -21,7 +21,12 @@ HTTP_BAD_REQUEST = 400
 MIN_COLORS_ALLOWED = 1
 MAX_COLORS_ALLOWED = 10
 MIN_DURATION_MS = 0
-MAX_DURATION_MS = 15000  # 15 seconds
+MAX_DURATION_MS = 4000  # 4 seconds
+
+DEFAULT = {
+    'display_duration_ms': 1000,
+    'fadeout_duration_ms': 1000,
+    'colors': ['FFFFFF', 'FF00FF']}
 
 SCHEMA = {
     'display_duration_ms': int,
@@ -75,8 +80,8 @@ class ColorHandler(RequestHandler):
     def get(self):
         data = Data.get_by_key_name(DATA_KEY)
         if not data:
-            self.return_error('There is no color data available right now.\n')
-            return
+            data = Data(key_name=DATA_KEY, **DEFAULT)
+            data.put()
 
         if self.request.get('format') == 'json':
             self.return_json(data.to_dict())
@@ -84,7 +89,7 @@ class ColorHandler(RequestHandler):
             display = str(data.display_duration_ms)
             fadeout = str(data.fadeout_duration_ms)
             for color in data.colors:
-                self.response.write(':'.join((color, display, fadeout)))
+                self.response.write(':'.join((color, fadeout, display)))
                 self.response.write(' ')
             self.response.write('\n')
 
