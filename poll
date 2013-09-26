@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+"""This tool checks the COLORS_HANDLER and whenever there is a change,
+executes the program given as arguments. The program being executed
+will be given arguments that are formed from the data at
+COLORS_HANDLER.
+"""
+
+__author__ = 'Aryan Naraghi (aryan.naraghi@gmail.com)'
+
+import common
+import httplib
+import json
+import logging
+import re
+import subprocess
+import sys
+import time
+import urllib
+
+COLORS_HANDLER = 'http://localhost:8080/colors'
+BAD_REQ_TIMEOUT_SEC = 10
+
+
+def main(argv):
+    if len(argv) < 2:
+        raise ValueError('You must provide a program to run.')
+
+    colors_handler = COLORS_HANDLER
+
+    logging.basicConfig(level=logging.INFO)
+    prev = None
+    while True:
+        res = urllib.urlopen(colors_handler)
+
+        if res.getcode() != httplib.OK:
+            logging.warn('Received HTTP status code %s.', res.getcode())
+            time.sleep(BAD_REQ_TIMEOUT_SEC)
+            continue
+
+        cur = res.read().strip()
+        if cur != prev:
+            try:
+                config = common.parse_config(cur)
+            except ValueError as e:
+                logging.error('Could not parse config: %s', e.message)
+                time.sleep(BAD_REQ_TIMEOUT_SEC)
+                continue
+
+            args = argv[1:]
+            args += [':'.join([color,
+                              str(config['display_duration_ms']),
+                              str(config['fadeout_duration_ms'])])
+                    for color in config['colors']]
+            subprocess.call(args)
+
+        prev = cur
+
+        # Ensures that we do not hang on the first request.
+        if not colors_handler.endswith('?hang=1'):
+            colors_handler += '?hang=1'
+
+
+if __name__ == '__main__':
+    main(sys.argv)
