@@ -132,7 +132,7 @@
               setStatus(STATUSES.failed);
             }
           };
-          req.open("GET", "/colors?format=json", true);
+          req.open("GET", "/colors?hang=0", true);
           req.send(null);
         };
         getCurrentState();
