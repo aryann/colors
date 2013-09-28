@@ -3,44 +3,29 @@
 __author__ = 'Aryan Naraghi (aryan.naraghi@gmail.com)'
 
 import common
-import hashlib
 import httplib
 import json
 import logging
 import os
-import webapp2
 import time
+import webapp2
 
-from google.appengine.ext import db
+from google.appengine.ext import ndb
 from google.appengine.ext.webapp import template
 
 
 _HANGING_GET_DURATION_SEC = 25
 
 
-class Client(db.Model):
-    user_agent = db.StringProperty()
-    ip = db.StringProperty()
+class ColorConfig(ndb.Model):
+    insert_time = ndb.DateTimeProperty(auto_now=True)
+    user_agent = ndb.StringProperty()
+    ip = ndb.StringProperty()
 
-    @staticmethod
-    def get_or_create(user_agent, ip):
-        h = hashlib.sha1()
-        h.update(str(user_agent))
-        h.update(str(ip))
-        return Client.get_or_insert(
-            key_name=h.hexdigest(),
-            user_agent=user_agent,
-            ip=ip)
+    colors = ndb.StringProperty(repeated=True, choices=common.SUPPORTED_COLORS)
+    display_duration_ms = ndb.IntegerProperty(required=True)
+    fadeout_duration_ms = ndb.IntegerProperty(required=True)
 
-
-class ColorConfig(db.Model):
-    insert_time = db.DateTimeProperty(auto_now=True)
-
-    colors = db.StringListProperty()
-    display_duration_ms = db.IntegerProperty()
-    fadeout_duration_ms = db.IntegerProperty()
-
-    client = db.ReferenceProperty()
 
     @staticmethod
     def default():
@@ -59,7 +44,9 @@ class ColorConfig(db.Model):
     def __eq__(self, other):
         if other is None:
             return False
-        return self.key() == other.key()
+        return (self.colors == other.colors and
+                self.display_duration_ms == other.display_duration_ms and
+                self.fadeout_duration_ms == other.fadeout_duration_ms)
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -70,10 +57,12 @@ class ColorHandler(webapp2.RequestHandler):
 
     def get_latest(self):
         """Returns the latest color record or None."""
-        result = list(ColorConfig.all().order('-insert_time').run(limit=1))
-        if not result:
+        query = ColorConfig.query().order(-ColorConfig.insert_time)
+        results = query.fetch(1)
+        if results:
+            return results[0]
+        else:
             return None
-        return result[0]
 
     def get(self):
         """Handles requests to get the color configurations as JSON.
@@ -114,15 +103,12 @@ class ColorHandler(webapp2.RequestHandler):
             self.response.set_status(httplib.BAD_REQUEST)
             return
 
-        client = Client.get_or_create(
-            user_agent=self.request.user_agent,
-            ip=self.request.remote_addr)
-        client.put()
         config = ColorConfig(
             display_duration_ms=payload['display_duration_ms'],
             fadeout_duration_ms=payload['fadeout_duration_ms'],
             colors=payload['colors'],
-            client=client)
+            user_agent=self.request.user_agent,
+            ip=self.request.remote_addr)
         config.put()
 
         self.response.set_status(httplib.OK)
